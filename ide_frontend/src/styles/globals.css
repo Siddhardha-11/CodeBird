@@ -23,6 +23,12 @@ body {
   overflow-x: hidden;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 #root {
   min-height: 100vh;
   background-color: var(--bg);
@@ -36,4 +42,27 @@ textarea {
 
 textarea {
   resize: vertical;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.28) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.22);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.34);
 }

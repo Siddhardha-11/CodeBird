@@ -1,25 +1,80 @@
 import React from 'react';
+import MonacoEditor from '@monaco-editor/react';
 
-const Editor = ({ file }) => {
-  const lines = file.content.split('\n');
+function getLanguage(path) {
+  if (path.endsWith('.json')) return 'json';
+  if (path.endsWith('.css')) return 'css';
+  if (path.endsWith('.html')) return 'html';
+  if (path.endsWith('.js')) return 'javascript';
+  if (path.endsWith('.jsx')) return 'javascript';
+  return 'plaintext';
+}
+
+const Editor = ({
+  activeFilePath,
+  openFiles,
+  files,
+  onSelectTab,
+  onCloseTab,
+  onChange,
+}) => {
+  const activeContent = activeFilePath ? files[activeFilePath] : '';
 
   return (
-    <section className="min-w-0 flex-1 border-r border-slate-800 bg-slate-950/90 text-xs md:text-sm">
-      <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2 text-[11px] text-slate-400">
-        <span>{file.path}</span>
-        <span className="uppercase tracking-[0.25em] text-slate-500">{file.language}</span>
-      </div>
-      <div className="grid h-full min-h-[420px] grid-cols-[auto_1fr] overflow-auto font-mono">
-        <div className="select-none border-r border-slate-800 bg-slate-950 px-3 py-4 text-right text-slate-600">
-          {lines.map((_, index) => (
-            <div key={`${file.path}-line-${index + 1}`} className="leading-6">
-              {index + 1}
+    <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[#0a0f18]">
+      <div className="flex min-h-11 items-end overflow-x-auto border-b border-slate-800 bg-[#0f1724]">
+        {openFiles.map((path) => {
+          const isActive = path === activeFilePath;
+
+          return (
+            <div
+              key={path}
+              className={`flex min-w-[180px] items-center justify-between gap-3 border-r border-slate-800 px-4 py-3 text-sm ${
+                isActive ? 'bg-[#0a0f18] text-slate-100' : 'text-slate-400'
+              }`}
+            >
+              <button type="button" onClick={() => onSelectTab(path)} className="truncate text-left">
+                {path}
+              </button>
+              <button
+                type="button"
+                onClick={() => onCloseTab(path)}
+                className="rounded text-slate-500 transition hover:text-slate-200"
+              >
+                x
+              </button>
             </div>
-          ))}
-        </div>
-        <pre className="overflow-auto px-4 py-4 text-slate-100">
-          {file.content}
-        </pre>
+          );
+        })}
+      </div>
+
+      <div className="border-b border-slate-800 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-slate-500">
+        {activeFilePath || 'No file selected'}
+      </div>
+
+      <div className="min-h-0 flex-1">
+        {activeFilePath ? (
+          <MonacoEditor
+            height="100%"
+            language={getLanguage(activeFilePath)}
+            value={activeContent}
+            theme="vs-dark"
+            onChange={(value) => onChange(activeFilePath, value || '')}
+            options={{
+              automaticLayout: true,
+              fontSize: 14,
+              minimap: { enabled: false },
+              padding: { top: 16 },
+              smoothScrolling: true,
+              scrollBeyondLastLine: false,
+              wordWrap: 'on',
+            }}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-sm text-slate-500">
+            Select a file to start editing
+          </div>
+        )}
       </div>
     </section>
   );
