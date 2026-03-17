@@ -7,7 +7,7 @@ import Editor from '../components/IDE/Editor.jsx';
 import PreviewPanel from '../components/IDE/PreviewPanel.jsx';
 import { buildInitialProject, createPreviewDocument } from '../components/IDE/mockProject.js';
 import { collectFilePaths, getParentPath, insertNode } from '../components/IDE/treeUtils.js';
-import { createWorkspace, getSavedAnswers, getSavedIdea } from '../lib/codebird.js';
+import { createWorkspace, getSavedAnswers, getSavedIdea, startSandbox } from '../lib/codebird.js';
 
 const STORAGE_KEY = 'codebird.ide.project';
 const MIN_FILES_WIDTH = 220;
@@ -74,6 +74,9 @@ const IDE = () => {
   const [filePanelWidth, setFilePanelWidth] = useState(276);
   const [previewPanelWidth, setPreviewPanelWidth] = useState(368);
   const [terminalHeight, setTerminalHeight] = useState(170);
+  const [sandboxUrl, setSandboxUrl] = useState('');
+  const [sandboxState, setSandboxState] = useState('sandbox idle');
+  const [isSandboxRefreshing, setIsSandboxRefreshing] = useState(false);
   const [logs, setLogs] = useState([
     '[ui] workspace booted',
     '[preview] iframe ready',
@@ -116,6 +119,37 @@ const IDE = () => {
 
   const logMessage = (message) => {
     setLogs((current) => [...current, message]);
+  };
+
+  const refreshSandbox = async () => {
+    setIsSandboxOpen(true);
+    setIsTerminalOpen(true);
+    setIsSandboxRefreshing(true);
+    setSandboxState('starting sandbox...');
+    setStatus('starting sandbox...');
+    logMessage(`[sandbox] starting ${workspace.sandboxProjectPath}`);
+
+    try {
+      const result = await startSandbox(workspace.sandboxProjectPath);
+      const nextSandboxUrl = result.frontend?.url || '';
+      const backendUrl = result.backend?.url || '';
+
+      setSandboxUrl(nextSandboxUrl);
+      setPreviewKey((current) => current + 1);
+      setSandboxState(nextSandboxUrl ? `sandbox live at ${nextSandboxUrl}` : 'sandbox started');
+      setStatus('sandbox running');
+      logMessage(`[sandbox] frontend ${nextSandboxUrl || 'not started'}`);
+
+      if (backendUrl) {
+        logMessage(`[sandbox] backend ${backendUrl}`);
+      }
+    } catch (error) {
+      setSandboxState('sandbox failed');
+      setStatus('sandbox failed');
+      logMessage(`[sandbox:error] ${error.message}`);
+    } finally {
+      setIsSandboxRefreshing(false);
+    }
   };
 
   const openFile = (path) => {
@@ -394,6 +428,11 @@ const IDE = () => {
                   <PreviewPanel
                     previewDocument={previewDocument}
                     refreshKey={previewKey}
+                    sandboxUrl={sandboxUrl}
+                    sandboxState={sandboxState}
+                    isRefreshing={isSandboxRefreshing}
+                    onRefresh={refreshSandbox}
+                    onClose={() => setIsSandboxOpen(false)}
                   />
                 </div>
               </>

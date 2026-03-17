@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   idea: 'codebird.idea',
   answers: 'codebird.answers',
 };
+const SANDBOX_API_URL = 'http://localhost:5050';
 
 const DEFAULT_IDEA =
   'A simple AI-assisted app builder that turns a plain-language idea into code, questions, and a live workspace.';
@@ -224,6 +225,7 @@ body {
 
 const app = express();
 app.use(express.json());
+const PORT = Number(process.env.PORT) || 5000;
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, project: "${appSlug}" });
@@ -238,11 +240,29 @@ app.post("/api/generate", (req, res) => {
   });
 });
 
-app.listen(5000, () => {
-  console.log("Backend running on http://localhost:5000");
+app.listen(PORT, () => {
+  console.log(\`Backend running on http://localhost:\${PORT}\`);
 });`,
     },
   ];
+}
+
+export async function startSandbox(projectPath) {
+  const response = await fetch(`${SANDBOX_API_URL}/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ projectPath }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to start sandbox.');
+  }
+
+  return data;
 }
 
 export function getSavedIdea() {
@@ -269,6 +289,7 @@ export function createWorkspace(idea = getSavedIdea(), answers = getSavedAnswers
 
   return {
     projectName,
+    sandboxProjectPath: 'generated-app/project_1',
     branchName: 'ai-draft',
     appType: safeAnswers[1],
     audience: safeAnswers[2],
