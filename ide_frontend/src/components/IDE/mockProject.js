@@ -18,6 +18,29 @@ export function buildInitialProject(workspace) {
   const safeName = escapeForTemplate(workspace.projectName || 'CodeBird Studio');
 
   const files = {
+    'index.html': `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${safeName}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+`,
+    'src/main.jsx': `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+`,
     'src/App.jsx': `import Home from './pages/Home';
 
 export default function App() {
@@ -158,24 +181,21 @@ body {
   color: var(--muted);
 }
 `,
-    'public/index.html': `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${safeName}</title>
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
-</html>
-`,
     'package.json': `{
   "name": "${workspace.projectName.toLowerCase().replace(/\s+/g, '-')}",
   "private": true,
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1",
+    "@vitejs/plugin-react": "^5.0.2"
   }
 }
 `,
@@ -270,6 +290,7 @@ body {
   };
 
   const tree = [
+    createNode('index.html', 'file'),
     createNode('src', 'folder', [
       createNode('src/components', 'folder', [
         createNode('src/components/HeroCard.jsx', 'file'),
@@ -277,9 +298,9 @@ body {
       ]),
       createNode('src/pages', 'folder', [createNode('src/pages/Home.jsx', 'file')]),
       createNode('src/App.jsx', 'file'),
+      createNode('src/main.jsx', 'file'),
       createNode('src/styles.css', 'file'),
     ]),
-    createNode('public', 'folder', [createNode('public/index.html', 'file')]),
     createNode('preview', 'folder', [createNode('preview/index.html', 'file')]),
     createNode('package.json', 'file'),
   ];

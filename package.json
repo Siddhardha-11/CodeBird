@@ -1,0 +1,15 @@
+{
+  "name": "codebird",
+  "private": true,
+  "scripts": {
+    "install:frontend": "npm --prefix ide_frontend install",
+    "install:backend": "npm --prefix ide_backend install",
+    "install:all": "npm run install:frontend && npm run install:backend",
+    "dev:frontend": "npm --prefix ide_frontend run dev",
+    "dev:backend": "npm --prefix ide_backend start",
+    "build:frontend": "npm --prefix ide_frontend run build"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

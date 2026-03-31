@@ -1,5 +1,3 @@
-import React from 'react';
-
 const DEVICE_WIDTHS = {
   desktop: '100%',
   tablet: '820px',

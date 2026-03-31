@@ -1,4 +1,3 @@
-import React from 'react';
 import MCQOption from './MCQOption.jsx';
 
 const QuestionCard = ({ question, onSelect, onBack, showBack }) => {

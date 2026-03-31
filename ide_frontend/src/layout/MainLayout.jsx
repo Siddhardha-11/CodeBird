@@ -1,5 +1,3 @@
-import React from 'react';
-
 const MainLayout = ({ children, fullWidth = false, contentClassName = '' }) => {
   return (
     <div className="min-h-screen bg-slate-900">

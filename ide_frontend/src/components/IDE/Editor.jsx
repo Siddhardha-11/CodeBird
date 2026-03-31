@@ -1,4 +1,3 @@
-import React from 'react';
 import MonacoEditor from '@monaco-editor/react';
 
 function getLanguage(path) {
