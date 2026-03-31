@@ -1,5 +1,6 @@
 const STORAGE_KEYS = {
-  idea: 'codebird.idea',
+  activeIdea: 'codebird.activeIdea',
+  homeDraft: 'codebird.homeDraft',
   answers: 'codebird.answers',
 };
 const SANDBOX_API_URL = 'http://localhost:5050';
@@ -8,9 +9,26 @@ const DEFAULT_IDEA =
   'A simple AI-assisted app builder that turns a plain-language idea into code, questions, and a live workspace.';
 
 const DEFAULT_ANSWERS = {
-  1: 'Simple website',
-  2: 'Public users',
-  3: 'All devices',
+  items: [
+    {
+      id: 1,
+      field: 'primaryGoal',
+      text: 'What is the main goal of this app?',
+      answer: 'Simple website',
+    },
+    {
+      id: 2,
+      field: 'primaryUsers',
+      text: 'Who will use this app most often?',
+      answer: 'Public users',
+    },
+    {
+      id: 3,
+      field: 'devicePriority',
+      text: 'Where should this app work best?',
+      answer: 'All devices',
+    },
+  ],
 };
 
 const TITLE_STOP_WORDS = new Set([
@@ -18,12 +36,21 @@ const TITLE_STOP_WORDS = new Set([
   'an',
   'and',
   'app',
+  'application',
+  'build',
+  'create',
   'for',
+  'help',
+  'i',
+  'idea',
+  'make',
   'my',
   'of',
+  'personal',
   'simple',
   'the',
   'to',
+  'want',
   'web',
   'website',
 ]);
@@ -77,7 +104,7 @@ function inferProjectName(idea) {
     return 'CodeBird Studio';
   }
 
-  return titleCase(words.slice(0, 2).join(' '));
+  return titleCase(words.slice(0, 3).join(' '));
 }
 
 function slugify(value) {
@@ -87,33 +114,51 @@ function slugify(value) {
     .replace(/^-+|-+$/g, '');
 }
 
+function normalizeAnswers(rawAnswers) {
+  if (Array.isArray(rawAnswers?.items)) {
+    return rawAnswers.items.filter((item) => item?.answer);
+  }
+
+  return Object.entries(rawAnswers || {})
+    .filter(([, value]) => value)
+    .map(([key, value]) => ({
+      id: Number(key),
+      field: `question_${key}`,
+      text: `Question ${key}`,
+      answer: value,
+    }));
+}
+
+function answerAt(items, index, fallback) {
+  return items[index]?.answer || fallback;
+}
+
 function buildHighlights(idea, answers) {
+  const items = normalizeAnswers(answers);
+
   return [
-    `Built around ${answers[1] || DEFAULT_ANSWERS[1].toLowerCase()}.`,
-    `Primary audience: ${answers[2] || DEFAULT_ANSWERS[2]}.`,
-    `Optimized for ${answers[3] || DEFAULT_ANSWERS[3].toLowerCase()}.`,
+    `Built around ${answerAt(items, 0, 'your chosen flow').toLowerCase()}.`,
+    `Shaped for ${answerAt(items, 1, 'your main users')}.`,
+    `Optimized with ${answerAt(items, 2, 'your priorities')} in mind.`,
     `Core concept: ${idea}.`,
   ];
 }
 
 function buildFeatures(answers) {
-  const appType = answers[1] || DEFAULT_ANSWERS[1];
-  const audience = answers[2] || DEFAULT_ANSWERS[2];
-  const device = answers[3] || DEFAULT_ANSWERS[3];
+  const items = normalizeAnswers(answers);
 
   return [
-    `Idea capture and guided setup for a ${appType.toLowerCase()}.`,
-    `AI workspace tuned for ${audience.toLowerCase()}.`,
-    `Responsive screens designed for ${device.toLowerCase()}.`,
+    ...items.slice(0, 3).map((item) => `${item.text} Answer selected: ${item.answer}.`),
     'Generated starter files, milestones, and preview notes.',
-  ];
+  ].slice(0, 4);
 }
 
 function createFileContent(projectName, idea, answers) {
   const appSlug = slugify(projectName);
-  const audience = answers[2] || DEFAULT_ANSWERS[2];
-  const appType = answers[1] || DEFAULT_ANSWERS[1];
-  const device = answers[3] || DEFAULT_ANSWERS[3];
+  const items = normalizeAnswers(answers);
+  const first = items[0] || { text: 'Primary direction', answer: 'Starter app flow' };
+  const second = items[1] || { text: 'Target users', answer: 'General users' };
+  const third = items[2] || { text: 'Priority focus', answer: 'Usable on all devices' };
 
   return [
     {
@@ -130,16 +175,16 @@ function createFileContent(projectName, idea, answers) {
 
       <section className="grid">
         <article className="panel">
-          <h2>Audience</h2>
-          <p>${audience}</p>
+          <h2>${first.text.replace(/"/g, '\\"')}</h2>
+          <p>${first.answer.replace(/"/g, '\\"')}</p>
         </article>
         <article className="panel">
-          <h2>App Type</h2>
-          <p>${appType}</p>
+          <h2>${second.text.replace(/"/g, '\\"')}</h2>
+          <p>${second.answer.replace(/"/g, '\\"')}</p>
         </article>
         <article className="panel">
-          <h2>Best On</h2>
-          <p>${device}</p>
+          <h2>${third.text.replace(/"/g, '\\"')}</h2>
+          <p>${third.answer.replace(/"/g, '\\"')}</p>
         </article>
       </section>
     </main>
@@ -265,12 +310,46 @@ export async function startSandbox(projectPath) {
   return data;
 }
 
+export async function generateNextQuestion(idea, history = []) {
+  const response = await fetch(`${SANDBOX_API_URL}/api/questions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ idea, history }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to generate questions.');
+  }
+
+  if (!data.question) {
+    throw new Error('No question was generated.');
+  }
+
+  return data;
+}
+
 export function getSavedIdea() {
-  return readStorage(STORAGE_KEYS.idea, DEFAULT_IDEA);
+  return readStorage(STORAGE_KEYS.activeIdea, DEFAULT_IDEA);
 }
 
 export function saveIdea(idea) {
-  writeStorage(STORAGE_KEYS.idea, idea);
+  writeStorage(STORAGE_KEYS.activeIdea, idea);
+}
+
+export function getHomeDraftIdea() {
+  return readStorage(STORAGE_KEYS.homeDraft, '');
+}
+
+export function saveHomeDraftIdea(idea) {
+  writeStorage(STORAGE_KEYS.homeDraft, idea);
+}
+
+export function clearHomeDraftIdea() {
+  writeStorage(STORAGE_KEYS.homeDraft, '');
 }
 
 export function getSavedAnswers() {
@@ -283,7 +362,8 @@ export function saveAnswers(answers) {
 
 export function createWorkspace(idea = getSavedIdea(), answers = getSavedAnswers()) {
   const safeIdea = idea || DEFAULT_IDEA;
-  const safeAnswers = { ...DEFAULT_ANSWERS, ...answers };
+  const safeAnswers = Array.isArray(answers?.items) ? answers : DEFAULT_ANSWERS;
+  const normalizedAnswers = normalizeAnswers(safeAnswers);
   const projectName = inferProjectName(safeIdea);
   const files = createFileContent(projectName, safeIdea, safeAnswers);
 
@@ -291,9 +371,9 @@ export function createWorkspace(idea = getSavedIdea(), answers = getSavedAnswers
     projectName,
     sandboxProjectPath: 'generated-app/project_1',
     branchName: 'ai-draft',
-    appType: safeAnswers[1],
-    audience: safeAnswers[2],
-    device: safeAnswers[3],
+    appType: answerAt(normalizedAnswers, 0, 'Starter app'),
+    audience: answerAt(normalizedAnswers, 1, 'General users'),
+    device: answerAt(normalizedAnswers, 2, 'All devices'),
     idea: safeIdea,
     stack: ['React', 'Tailwind CSS', 'Express API'],
     milestones: [

@@ -1,25 +1,26 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const MCQOption = ({ label, onClick }) => {
-  const [selected, setSelected] = useState(false);
+  const [pressed, setPressed] = useState(false);
 
-  const handle = () => {
-    setSelected(true);
+  const handleClick = () => {
+    setPressed(true);
     onClick();
-    setTimeout(() => setSelected(false), 150);
+    window.setTimeout(() => setPressed(false), 150);
   };
 
   return (
     <button
       type="button"
-      onClick={handle}
-      className={`w-full text-left px-4 py-3 md:px-5 md:py-4 rounded-2xl border transition
-        ${selected
-          ? 'border-sky-400 bg-sky-500/10 text-sky-100'
-          : 'border-slate-700 bg-slate-800 hover:border-sky-400 hover:bg-slate-700 text-slate-100'
-        }`}
+      onClick={handleClick}
+      className={`flex w-full items-center justify-between rounded-[24px] border px-5 py-4 text-left transition sm:px-6 sm:py-5 ${
+        pressed
+          ? 'border-sky-400 bg-sky-400/10 text-sky-100'
+          : 'border-slate-800 bg-slate-900/70 text-slate-100 hover:border-slate-700 hover:bg-slate-900'
+      }`}
     >
-      {label}
+      <span className="pr-4 text-sm font-medium leading-7 sm:text-base">{label}</span>
+      <span className="text-slate-500">&gt;</span>
     </button>
   );
 };
