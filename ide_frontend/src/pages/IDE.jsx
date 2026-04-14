@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import MainLayout from '../layout/MainLayout.jsx';
@@ -5,9 +6,15 @@ import TopBar from '../components/IDE/TopBar.jsx';
 import FileExplorer from '../components/IDE/FileExplorer.jsx';
 import Editor from '../components/IDE/Editor.jsx';
 import PreviewPanel from '../components/IDE/PreviewPanel.jsx';
-import { buildInitialProject, createPreviewDocument } from '../components/IDE/mockProject.js';
+
 import { collectFilePaths, getParentPath, insertNode } from '../components/IDE/treeUtils.js';
-import { createWorkspace, getSavedAnswers, getSavedIdea, startSandbox } from '../lib/codebird.js';
+import {
+  createWorkspace,
+  getSavedAnswers,
+  getSavedIdea,
+  generateProjectFromWorkspace,
+  startSandbox
+} from '../lib/codebird.js';
 
 const STORAGE_KEY = 'codebird.ide.project';
 const MIN_FILES_WIDTH = 220;
@@ -53,12 +60,13 @@ function createBlankFileContent(path) {
 
 const IDE = () => {
   const workspace = createWorkspace(getSavedIdea(), getSavedAnswers());
-  const initialProject = buildInitialProject(workspace);
+  console.log("IDE mounted");
+console.log("workspace:", workspace);
   const parsedProject = readStoredProject();
   const layoutRef = useRef(null);
 
-  const [tree, setTree] = useState(parsedProject?.tree || initialProject.tree);
-  const [files, setFiles] = useState(parsedProject?.files || initialProject.files);
+ const [tree, setTree] = useState([]);
+const [files, setFiles] = useState({});
   const [openFiles, setOpenFiles] = useState(parsedProject?.openFiles || ['src/App.jsx', 'preview/index.html']);
   const [activeFilePath, setActiveFilePath] = useState(parsedProject?.activeFilePath || 'src/App.jsx');
   const [selectedNodePath, setSelectedNodePath] = useState(parsedProject?.selectedNodePath || 'src');
@@ -70,7 +78,7 @@ const IDE = () => {
   const [status, setStatus] = useState('saved locally');
   const [isFilesOpen, setIsFilesOpen] = useState(true);
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
-  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(true);
   const [filePanelWidth, setFilePanelWidth] = useState(276);
   const [previewPanelWidth, setPreviewPanelWidth] = useState(368);
   const [terminalHeight, setTerminalHeight] = useState(170);
@@ -121,37 +129,62 @@ const IDE = () => {
     setLogs((current) => [...current, message]);
   };
 
-  const refreshSandbox = async () => {
-    setIsSandboxOpen(true);
-    setIsTerminalOpen(true);
-    setIsSandboxRefreshing(true);
-    setSandboxState('starting sandbox...');
-    setStatus('starting sandbox...');
-    logMessage(`[sandbox] starting ${workspace.sandboxProjectPath}`);
+const refreshSandbox = async () => {
+  setIsSandboxOpen(true);
+  setIsTerminalOpen(true);
+  setIsSandboxRefreshing(true);
+  setSandboxState('generating project...');
+  setStatus('generating project...');
+  logMessage('[sandbox] generating project...');
 
-    try {
-      const result = await startSandbox(workspace.sandboxProjectPath);
-      const nextSandboxUrl = result.frontend?.url || '';
-      const backendUrl = result.backend?.url || '';
+  try {
+    const workspace = createWorkspace(getSavedIdea(), getSavedAnswers());
+    console.log("WORKSPACE:", workspace);
 
-      setSandboxUrl(nextSandboxUrl);
-      setPreviewKey((current) => current + 1);
-      setSandboxState(nextSandboxUrl ? `sandbox live at ${nextSandboxUrl}` : 'sandbox started');
-      setStatus('sandbox running');
-      logMessage(`[sandbox] frontend ${nextSandboxUrl || 'not started'}`);
+    const gen = await generateProjectFromWorkspace(workspace);
+    console.log("GEN RESULT:", gen);
 
-      if (backendUrl) {
-        logMessage(`[sandbox] backend ${backendUrl}`);
-      }
-    } catch (error) {
-      setSandboxState('sandbox failed');
-      setStatus('sandbox failed');
-      logMessage(`[sandbox:error] ${error.message}`);
-    } finally {
-      setIsSandboxRefreshing(false);
+    if (!gen || !gen.projectPath) {
+      throw new Error("Project generation failed");
     }
-  };
 
+    const projectPath = gen.projectPath;
+
+    logMessage(`[sandbox] generated at ${projectPath}`);
+
+    const result = await startSandbox(projectPath);
+    console.log("SANDBOX RESULT:", result);
+
+    const nextSandboxUrl = result.frontend?.url || '';
+    console.log("SANDBOX URL:", nextSandboxUrl); 
+    const backendUrl = result.backend?.url || '';
+
+    setSandboxUrl(nextSandboxUrl);
+    setPreviewKey((current) => current + 1);
+
+    setSandboxState(
+      nextSandboxUrl
+        ? `sandbox live at ${nextSandboxUrl}`
+        : 'sandbox started'
+    );
+
+    setStatus('sandbox running');
+
+    logMessage(`[sandbox] frontend ${nextSandboxUrl || 'not started'}`);
+
+    if (backendUrl) {
+      logMessage(`[sandbox] backend ${backendUrl}`);
+    }
+
+  } catch (error) {
+    console.error(error);
+    setSandboxState('sandbox failed');
+    setStatus('sandbox failed');
+    logMessage(`[sandbox:error] ${error.message}`);
+  } finally {
+    setIsSandboxRefreshing(false);
+  }
+};
   const openFile = (path) => {
     if (!files[path]) {
       return;
@@ -326,7 +359,7 @@ const IDE = () => {
     window.addEventListener('mouseup', handleUp);
   };
 
-  const previewDocument = createPreviewDocument(files, workspace);
+  const previewDocument = "";
   const editorMinWidth = useMemo(() => (isFilesOpen || isSandboxOpen ? 0 : '100%'), [isFilesOpen, isSandboxOpen]);
 
   return (

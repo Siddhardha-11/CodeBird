@@ -1,6 +1,6 @@
 const http = require("http");
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3001; // 🔥 FORCE CORRECT PORT
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/html" });

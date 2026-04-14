@@ -2,12 +2,15 @@ const loadEnvFile = require("./env");
 const express = require("express");
 const { fallbackNextQuestion, formatQuestionWarning, generateNextQuestion } = require("./gemini");
 const runSandbox = require("./sandbox");
+const generateRoute = require("./routes/generate"); // ✅ ADDED
 
 loadEnvFile();
 
 const app = express();
 
 app.use(express.json());
+
+// CORS
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -20,10 +23,12 @@ app.use((req, res, next) => {
   return next();
 });
 
+// health
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
 
+// questions
 app.post("/api/questions", async (req, res) => {
   const { idea, history = [] } = req.body || {};
 
@@ -49,6 +54,7 @@ app.post("/api/questions", async (req, res) => {
   }
 });
 
+// sandbox
 app.post("/run", async (req, res) => {
   const { projectPath } = req.body || {};
 
@@ -63,6 +69,9 @@ app.post("/run", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
+
+// ✅ GENERATOR ROUTE
+app.use("/generate", generateRoute);
 
 const PORT = Number(process.env.PORT) || 5050;
 

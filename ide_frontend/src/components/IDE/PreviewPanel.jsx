@@ -60,14 +60,12 @@ const PreviewPanel = ({
             className="mx-auto overflow-hidden rounded-[12px] border border-slate-800 bg-white transition-all duration-300"
             style={{ width: DEVICE_WIDTHS.desktop, minHeight: '620px' }}
           >
-            <iframe
-              key={refreshKey}
-              title="CodeBird Live Preview"
-              src={isLiveSandbox ? sandboxUrl : undefined}
-              srcDoc={isLiveSandbox ? undefined : previewDocument}
-              sandbox="allow-scripts allow-same-origin"
-              className="h-[620px] w-full bg-white"
-            />
+        <iframe
+  key={refreshKey}
+  title="Live App"
+  src={sandboxUrl || "about:blank"}
+  style={{ width: "100%", height: "100%", border: "none" }}
+/>
           </div>
         </div>
       </div>

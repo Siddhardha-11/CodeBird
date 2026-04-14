@@ -1,0 +1,1 @@
+export default function App(){return <h1>weather teller app for mobile</h1>}
