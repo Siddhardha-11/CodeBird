@@ -1,3 +1,6 @@
+import React, { useState, useEffect } from 'react';
+import { fetchProjects } from '../../lib/codebird.js';
+
 const ACTIONS = [
   {
     key: 'files',
@@ -49,6 +52,12 @@ const TopBar = ({
   isSandboxOpen,
   isTerminalOpen,
 }) => {
+  const [projects, setProjects] = useState([]);
+
+  useEffect(() => {
+    fetchProjects().then(setProjects);
+  }, []);
+
   return (
     <header className="border-b border-slate-800 bg-[#0e1522]">
       <div className="border-b border-slate-800 px-5 py-3">
@@ -96,7 +105,20 @@ const TopBar = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
-          <div className="rounded border border-slate-700 bg-[#111827] px-3 py-2 text-slate-300">
+          {projects.length > 0 && (
+            <select 
+              onChange={(e) => onAction('load-project', e.target.value)}
+              className="rounded border border-slate-700 bg-[#111827] px-3 py-2 text-sm text-slate-300 focus:outline-none"
+              defaultValue=""
+            >
+              <option value="" disabled>Load Previous Project</option>
+              {projects.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          )}
+
+          <div className="rounded border border-slate-700 bg-[#111827] px-3 py-2 text-sm text-slate-300">
             {status}
           </div>
         </div>

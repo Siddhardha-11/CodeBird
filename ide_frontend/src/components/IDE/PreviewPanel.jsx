@@ -54,20 +54,24 @@ const PreviewPanel = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-4">
-        <div className="mx-auto rounded-[16px] border border-slate-800 bg-slate-950 p-3">
-          <div
-            className="mx-auto overflow-hidden rounded-[12px] border border-slate-800 bg-white transition-all duration-300"
-            style={{ width: DEVICE_WIDTHS.desktop, minHeight: '620px' }}
-          >
-        <iframe
-  key={refreshKey}
-  title="Live App"
-  src={sandboxUrl || "about:blank"}
-  style={{ width: "100%", height: "100%", border: "none" }}
-/>
+      <div className="flex-1 w-full h-full bg-white relative">
+        {isRefreshing && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/90 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4">
+              <svg className="h-8 w-8 animate-spin text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <div className="text-sm font-medium tracking-wide text-slate-300">Generating Application...</div>
+            </div>
           </div>
-        </div>
+        )}
+        <iframe
+          key={refreshKey}
+          title="Live App"
+          src={sandboxUrl || "about:blank"}
+          style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0, border: "none" }}
+        />
       </div>
     </aside>
   );

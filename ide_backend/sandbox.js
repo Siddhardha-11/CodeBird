@@ -2,8 +2,23 @@ const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const SANDBOX_BACKEND_PORT = 5001;
-const SANDBOX_FRONTEND_PORT = 3001;
+let activePids = [];
+
+function killActiveProcesses() {
+  for (const pid of activePids) {
+    try {
+      if (process.platform === 'win32') {
+        const { execSync } = require('child_process');
+        execSync(`taskkill /pid ${pid} /T /F`);
+      } else {
+        process.kill(-pid, 'SIGKILL');
+      }
+    } catch (e) {
+      // Process might already be dead
+    }
+  }
+  activePids = [];
+}
 
 function runCommand(command, cwd, label) {
   return new Promise((resolve, reject) => {
@@ -33,7 +48,7 @@ function runCommand(command, cwd, label) {
 }
 
 function startDetached(command, cwd, label) {
-  const child = exec(command, { cwd });
+  const child = exec(command, { cwd, detached: process.platform !== 'win32' });
 
   child.stdout.on("data", (data) => {
     console.log(`[${label}] ${data}`.trimEnd());
@@ -49,13 +64,21 @@ function startDetached(command, cwd, label) {
     }
   });
 
+  activePids.push(child.pid);
   return child.pid;
+}
+
+function getRandomPort() {
+  return Math.floor(Math.random() * (40000 - 10000 + 1)) + 10000;
 }
 
 async function runSandbox(projectPath) {
   if (!projectPath) {
     throw new Error("No projectPath provided");
   }
+
+  // Kill any previous sandbox processes
+  killActiveProcesses();
 
   const backendPath = path.join(projectPath, "backend");
   const frontendPath = path.join(projectPath, "frontend");
@@ -71,9 +94,10 @@ async function runSandbox(projectPath) {
 
   if (fs.existsSync(backendPath)) {
     await runCommand("npm install", backendPath, "Backend Install");
-
+    
+    const port = getRandomPort();
     const backendPid = startDetached(
-      `node -e "process.env.PORT=${SANDBOX_BACKEND_PORT}; require('./server.js')"`,
+      `node -e "process.env.PORT=${port}; require('./server.js')"`,
       backendPath,
       "Backend"
     );
@@ -81,15 +105,16 @@ async function runSandbox(projectPath) {
     result.backend = {
       path: backendPath,
       pid: backendPid,
-      url: `http://localhost:${SANDBOX_BACKEND_PORT}`,
+      url: `http://localhost:${port}`,
     };
   }
 
   if (fs.existsSync(frontendPath)) {
     await runCommand("npm install", frontendPath, "Frontend Install");
 
+    const port = getRandomPort();
     const frontendPid = startDetached(
-      `node -e "process.env.PORT=${SANDBOX_FRONTEND_PORT}; require('./server.js')"`,
+      `node -e "process.env.PORT=${port}; require('./server.js')"`,
       frontendPath,
       "Frontend"
     );
@@ -97,7 +122,7 @@ async function runSandbox(projectPath) {
     result.frontend = {
       path: frontendPath,
       pid: frontendPid,
-      url: `http://localhost:${SANDBOX_FRONTEND_PORT}`,
+      url: `http://localhost:${port}`,
     };
   }
 

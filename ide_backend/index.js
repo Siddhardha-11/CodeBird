@@ -78,6 +78,10 @@ app.post("/run", async (req, res) => {
 // generator
 app.use("/generate", generateRoute);
 
+// projects
+const projectsRoute = require("./routes/projects");
+app.use("/api/projects", projectsRoute);
+
 const PORT = Number(process.env.PORT) || 5050;
 
 app.listen(PORT, () => {

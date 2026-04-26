@@ -108,11 +108,13 @@ STRICT RULES:
 
 Design expectations:
 - Centered layout
-- Clean typography
+- Clean typography (sans-serif, modern fonts)
 - Proper spacing (padding, margins)
-- Buttons styled
+- Buttons styled (hover states, rounded corners)
 - Inputs styled
-- Card-based UI or dashboard style
+- Beautiful Modern Dark Theme (deep dark backgrounds, glassmorphism layers, vibrant color accents)
+- Card-based UI or dashboard style with subtle borders
+- Professional aesthetics, no basic default browser styles
 
 Return ONLY valid JSON.
 

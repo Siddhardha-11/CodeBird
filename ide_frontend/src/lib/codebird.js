@@ -222,3 +222,21 @@ export async function generateWithAI(idea) {
 
   return data.files || data.result || data;
 }
+
+/* =========================
+   PROJECT HISTORY
+========================= */
+export async function fetchProjects() {
+  const response = await fetch(`${SANDBOX_API_URL}/api/projects`);
+  const data = await response.json().catch(() => ({ projects: [] }));
+  return data.projects || [];
+}
+
+export async function fetchProjectData(projectName) {
+  const response = await fetch(`${SANDBOX_API_URL}/api/projects/${projectName}`);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to fetch project");
+  }
+  return data;
+}

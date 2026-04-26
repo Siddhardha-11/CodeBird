@@ -13,7 +13,8 @@ import {
   getSavedAnswers,
   getSavedIdea,
   generateProjectFromWorkspace,
-  startSandbox
+  startSandbox,
+  fetchProjectData
 } from '../lib/codebird.js';
 
 const STORAGE_KEY = 'codebird.ide.project';
@@ -82,6 +83,7 @@ const [activeFilePath, setActiveFilePath] = useState('');
   const [filePanelWidth, setFilePanelWidth] = useState(276);
   const [previewPanelWidth, setPreviewPanelWidth] = useState(368);
   const [terminalHeight, setTerminalHeight] = useState(170);
+  const [isResizing, setIsResizing] = useState(false);
   const [sandboxUrl, setSandboxUrl] = useState('');
   const [sandboxState, setSandboxState] = useState('sandbox idle');
   const [isSandboxRefreshing, setIsSandboxRefreshing] = useState(false);
@@ -128,6 +130,14 @@ const [activeFilePath, setActiveFilePath] = useState('');
   const logMessage = (message) => {
     setLogs((current) => [...current, message]);
   };
+
+  const hasInitialized = useRef(false);
+  useEffect(() => {
+    if (!hasInitialized.current && Object.keys(files).length === 0) {
+      hasInitialized.current = true;
+      refreshSandbox();
+    }
+  }, []);
 console.log("🔥 REFRESH CLICKED");
 const refreshSandbox = async () => {
   setIsSandboxOpen(true);
@@ -346,7 +356,7 @@ logMessage(
     });
   };
 
-  const handleToolbarAction = (action) => {
+  const handleToolbarAction = async (action, payload) => {
     if (action === 'files') {
       setIsFilesOpen((current) => !current);
       return;
@@ -366,6 +376,57 @@ logMessage(
       setPreviewKey((current) => current + 1);
       setStatus('preview refreshed');
       logMessage('[preview] manual refresh');
+      return;
+    }
+
+    if (action === 'load-project') {
+      try {
+        logMessage(`[sandbox] loading project ${payload}...`);
+        setStatus(`loading ${payload}...`);
+        const data = await fetchProjectData(payload);
+        
+        const newFiles = {};
+        data.frontendFiles?.forEach(f => {
+          newFiles[f.path] = f.content;
+        });
+        data.backendFiles?.forEach(f => {
+          newFiles["backend/" + f.path] = f.content;
+        });
+
+        if (Object.keys(newFiles).length > 0) {
+          setFiles(newFiles);
+          const newTree = Object.keys(newFiles).map(path => {
+            const parts = path.split("/");
+            return {
+              id: path,
+              path,
+              name: parts[parts.length - 1],
+              type: "file"
+            };
+          });
+          setTree(newTree);
+          const firstFile = Object.keys(newFiles)[0];
+          if (firstFile) {
+            setOpenFiles([firstFile]);
+            setActiveFilePath(firstFile);
+          }
+          logMessage(`[sandbox] successfully loaded ${payload}`);
+          setStatus('Project loaded');
+          
+          // Re-trigger sandbox run
+          logMessage(`[sandbox] booting loaded project...`);
+          const result = await startSandbox(data.projectPath);
+          setSandboxUrl(result.frontend?.url || '');
+          setSandboxState(result.frontend?.url ? `sandbox live at ${result.frontend.url}` : 'sandbox started');
+          setPreviewKey(current => current + 1);
+        } else {
+          logMessage(`[sandbox] project ${payload} is empty`);
+          setStatus('Project empty');
+        }
+      } catch (err) {
+        logMessage(`[sandbox:error] failed to load ${payload}`);
+        setStatus('Error loading project');
+      }
       return;
     }
 
@@ -422,10 +483,12 @@ logMessage(
     };
 
     const handleUp = () => {
+      setIsResizing(false);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
 
+    setIsResizing(true);
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
   };
@@ -528,7 +591,8 @@ logMessage(
                   onMouseDown={startResize('preview')}
                   className="w-1 shrink-0 cursor-col-resize bg-slate-900 transition hover:bg-slate-700"
                 />
-                <div style={{ width: previewPanelWidth }} className="min-h-0 shrink-0">
+                <div style={{ width: previewPanelWidth, position: 'relative' }} className="min-h-0 shrink-0">
+                  {isResizing && <div className="absolute inset-0 z-50 bg-transparent" />}
                   <PreviewPanel
                     previewDocument={previewDocument}
                     refreshKey={previewKey}
