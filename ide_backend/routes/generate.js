@@ -5,43 +5,185 @@ const path = require("path");
 
 const BASE_DIR = path.join(__dirname, "..", "generated-app");
 
-function createProjectFolder() {
-  if (!fs.existsSync(BASE_DIR)) {
-    fs.mkdirSync(BASE_DIR, { recursive: true });
+function ensureDir(dirPath) {
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function getNextProjectPath() {
+  ensureDir(BASE_DIR);
+
+  const entries = fs.readdirSync(BASE_DIR, { withFileTypes: true });
+
+  let maxId = 0;
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+
+    const match = entry.name.match(/^project(\d+)$/i);
+    if (!match) continue;
+
+    const id = Number(match[1]);
+    if (!Number.isNaN(id) && id > maxId) {
+      maxId = id;
+    }
   }
 
-  const existing = fs.readdirSync(BASE_DIR).filter(f => f.startsWith("project"));
-  const nextId = existing.length + 1;
+  const nextId = maxId + 1;
+  return path.join(BASE_DIR, `project${nextId}`);
+}
 
-  const projectPath = path.join(BASE_DIR, `project${nextId}`);
-
-  fs.mkdirSync(projectPath);
-  fs.mkdirSync(path.join(projectPath, "frontend"));
-  fs.mkdirSync(path.join(projectPath, "backend"));
-
+function createProjectFolder() {
+  const projectPath = getNextProjectPath();
+  ensureDir(projectPath);
+  ensureDir(path.join(projectPath, "frontend"));
+  ensureDir(path.join(projectPath, "backend"));
   return projectPath;
+}
+
+function isInsideBase(baseDir, targetPath) {
+  const normalizedBase = path.normalize(baseDir + path.sep);
+  const normalizedTarget = path.normalize(targetPath);
+  return normalizedTarget.startsWith(normalizedBase);
+}
+
+function writeTextFile(fullPath, content) {
+  ensureDir(path.dirname(fullPath));
+  fs.writeFileSync(fullPath, content, "utf8");
+}
+
+function createStableFrontendServerCode() {
+  return `
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+
+const PORT = Number(process.env.PORT) || 3001;
+const ROOT_DIR = __dirname;
+
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".txt": "text/plain; charset=utf-8"
+};
+
+function getContentType(filePath) {
+  return MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream";
+}
+
+function send(res, statusCode, body, contentType = "text/plain; charset=utf-8") {
+  res.writeHead(statusCode, {
+    "Content-Type": contentType,
+    "Access-Control-Allow-Origin": "*"
+  });
+  res.end(body);
+}
+
+function safeResolve(urlPath) {
+  const cleanPath = decodeURIComponent((urlPath || "/").split("?")[0]);
+  const relativePath = cleanPath === "/" ? "/index.html" : cleanPath;
+  const resolvedPath = path.normalize(path.join(ROOT_DIR, relativePath));
+
+  if (!resolvedPath.startsWith(path.normalize(ROOT_DIR + path.sep))) {
+    return null;
+  }
+
+  return resolvedPath;
+}
+
+const server = http.createServer((req, res) => {
+  if (!req.url) {
+    return send(res, 400, "Bad Request");
+  }
+
+  const filePath = safeResolve(req.url);
+
+  if (!filePath) {
+    return send(res, 403, "Forbidden");
+  }
+
+  fs.stat(filePath, (statErr, stats) => {
+    if (statErr) {
+      return send(
+        res,
+        404,
+        \`<html><body style="font-family:sans-serif;padding:24px">
+          <h1>404 - File Not Found</h1>
+          <p>\${req.url}</p>
+        </body></html>\`,
+        "text/html; charset=utf-8"
+      );
+    }
+
+    const actualPath = stats.isDirectory() ? path.join(filePath, "index.html") : filePath;
+
+    fs.readFile(actualPath, (readErr, data) => {
+      if (readErr) {
+        return send(
+          res,
+          404,
+          \`<html><body style="font-family:sans-serif;padding:24px">
+            <h1>404 - File Not Found</h1>
+            <p>\${req.url}</p>
+          </body></html>\`,
+          "text/html; charset=utf-8"
+        );
+      }
+
+      return send(res, 200, data, getContentType(actualPath));
+    });
+  });
+});
+
+server.listen(PORT, () => {
+  console.log("Frontend running on http://localhost:" + PORT);
+});
+`.trimStart();
 }
 
 function writeFiles(projectPath, data) {
   const frontendPath = path.join(projectPath, "frontend");
   const backendPath = path.join(projectPath, "backend");
 
-  (data.frontend_files || []).forEach(f => {
-    const fullPath = path.join(frontendPath, f.path);
-    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    fs.writeFileSync(fullPath, f.code);
-  });
+  const frontendFiles = Array.isArray(data.frontend_files) ? data.frontend_files : [];
+  const backendFiles = Array.isArray(data.backend_files) ? data.backend_files : [];
 
-  (data.backend_files || []).forEach(f => {
-    const fullPath = path.join(backendPath, f.path);
-    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    fs.writeFileSync(fullPath, f.code);
-  });
+  for (const file of frontendFiles) {
+    if (!file || typeof file.path !== "string") continue;
+
+    const fullPath = path.join(frontendPath, file.path);
+    if (!isInsideBase(frontendPath, fullPath)) {
+      throw new Error(`Unsafe frontend path: ${file.path}`);
+    }
+
+    writeTextFile(fullPath, file.code ?? "");
+  }
+
+  for (const file of backendFiles) {
+    if (!file || typeof file.path !== "string") continue;
+
+    const fullPath = path.join(backendPath, file.path);
+    if (!isInsideBase(backendPath, fullPath)) {
+      throw new Error(`Unsafe backend path: ${file.path}`);
+    }
+
+    writeTextFile(fullPath, file.code ?? "");
+  }
+
+  // Always inject a stable frontend server so generated apps start reliably.
+  writeTextFile(path.join(frontendPath, "server.js"), createStableFrontendServerCode());
 }
 
 router.post("/", (req, res) => {
   try {
-    const { data } = req.body;
+    const { data } = req.body || {};
 
     if (!data) {
       return res.status(400).json({ error: "Missing data" });
@@ -50,11 +192,10 @@ router.post("/", (req, res) => {
     const projectPath = createProjectFolder();
     writeFiles(projectPath, data);
 
-    res.json({ success: true, projectPath });
-
+    return res.json({ success: true, projectPath });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message || "Failed to generate project" });
   }
 });
 

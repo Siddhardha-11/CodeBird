@@ -2,15 +2,13 @@ const loadEnvFile = require("./env");
 const express = require("express");
 const { fallbackNextQuestion, formatQuestionWarning, generateNextQuestion } = require("./gemini");
 const runSandbox = require("./sandbox");
-const generateRoute = require("./routes/generate"); // ✅ ADDED
+const generateRoute = require("./routes/generate");
 
 loadEnvFile();
 
 const app = express();
 
-app.use(express.json());
-
-// CORS
+// 🔥 1. CORS FIRST (MOST IMPORTANT)
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -20,8 +18,15 @@ app.use((req, res, next) => {
     return res.sendStatus(204);
   }
 
-  return next();
+  next();
 });
+
+// 🔥 2. THEN JSON
+app.use(express.json());
+
+// 🔥 3. ROUTES AFTER THAT
+const aiRoute = require("./routes/ai");
+app.use("/ai", aiRoute);
 
 // health
 app.get("/api/health", (req, res) => {
@@ -70,7 +75,7 @@ app.post("/run", async (req, res) => {
   }
 });
 
-// ✅ GENERATOR ROUTE
+// generator
 app.use("/generate", generateRoute);
 
 const PORT = Number(process.env.PORT) || 5050;

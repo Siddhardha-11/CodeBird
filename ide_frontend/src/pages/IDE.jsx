@@ -1,4 +1,4 @@
-
+import { generateWithAI } from '../lib/codebird.js';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import MainLayout from '../layout/MainLayout.jsx';
@@ -67,8 +67,8 @@ console.log("workspace:", workspace);
 
  const [tree, setTree] = useState([]);
 const [files, setFiles] = useState({});
-  const [openFiles, setOpenFiles] = useState(parsedProject?.openFiles || ['src/App.jsx', 'preview/index.html']);
-  const [activeFilePath, setActiveFilePath] = useState(parsedProject?.activeFilePath || 'src/App.jsx');
+  const [openFiles, setOpenFiles] = useState([]);
+const [activeFilePath, setActiveFilePath] = useState('');
   const [selectedNodePath, setSelectedNodePath] = useState(parsedProject?.selectedNodePath || 'src');
   const [selectedNodeType, setSelectedNodeType] = useState(parsedProject?.selectedNodeType || 'folder');
   const [expandedFolders, setExpandedFolders] = useState(
@@ -128,7 +128,7 @@ const [files, setFiles] = useState({});
   const logMessage = (message) => {
     setLogs((current) => [...current, message]);
   };
-
+console.log("🔥 REFRESH CLICKED");
 const refreshSandbox = async () => {
   setIsSandboxOpen(true);
   setIsTerminalOpen(true);
@@ -138,11 +138,74 @@ const refreshSandbox = async () => {
   logMessage('[sandbox] generating project...');
 
   try {
-    const workspace = createWorkspace(getSavedIdea(), getSavedAnswers());
-    console.log("WORKSPACE:", workspace);
+    const idea = getSavedIdea();
 
-    const gen = await generateProjectFromWorkspace(workspace);
-    console.log("GEN RESULT:", gen);
+// 🔥 STEP 1: AI
+logMessage('[ai] requesting code...');
+console.log("👉 CALLING AI");
+const aiFiles = await generateWithAI(idea);
+console.log("✅ AI RETURNED", aiFiles);
+console.log("AI FILES:", aiFiles);
+
+if (!aiFiles) {
+  throw new Error("AI returned nothing");
+}
+
+// 🔥 STEP 2: convert
+const frontend_files = Object.entries(aiFiles.frontend || {}).map(
+  ([path, code]) => ({ path, code })
+);
+
+const backend_files = Object.entries(aiFiles.backend || {}).map(
+  ([path, code]) => ({ path, code })
+);
+
+// 🔥 STEP 3: generate
+logMessage('[sandbox] writing files...');
+const gen = await fetch("http://localhost:5050/generate", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    data: { frontend_files, backend_files }
+  })
+}).then(res => res.json());
+// 🔥 LOAD FILES INTO IDE UI
+const newFiles = {};
+
+// frontend files
+frontend_files.forEach(f => {
+  newFiles[f.path] = f.code;
+});
+
+// backend files (optional)
+backend_files.forEach(f => {
+  newFiles["backend/" + f.path] = f.code;
+});
+
+setFiles(newFiles);
+const newTree = Object.keys(newFiles).map(path => {
+  const parts = path.split("/");
+  return {
+    id: path,
+    path,
+    name: parts[parts.length - 1],
+    type: "file"
+  };
+});
+
+setTree(newTree);
+
+// optional: open first file automatically
+const firstFile = Object.keys(newFiles)[0];
+if (firstFile) {
+  setOpenFiles([firstFile]);
+  setActiveFilePath(firstFile);
+}
+console.log("GEN RESULT:", gen);
+
+if (!gen.projectPath) {
+  throw new Error("Generation failed");
+}
 
     if (!gen || !gen.projectPath) {
       throw new Error("Project generation failed");
@@ -180,7 +243,15 @@ const refreshSandbox = async () => {
     console.error(error);
     setSandboxState('sandbox failed');
     setStatus('sandbox failed');
-    logMessage(`[sandbox:error] ${error.message}`);
+    console.error("FULL ERROR:", error);
+
+logMessage(
+  `[sandbox:error] ${
+    error?.response
+      ? JSON.stringify(error.response)
+      : error.message
+  }`
+);
   } finally {
     setIsSandboxRefreshing(false);
   }
